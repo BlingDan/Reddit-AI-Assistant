@@ -178,7 +178,7 @@ registerHandler('YOUR_TYPE', async (request, sendResponse) => { ... });
 
 ## Inspiration
 
-This project was inspired by [linuxdo-scripts](https://github.com/anghunk/linuxdo-scripts), an excellent browser extension for the LinuxDo forum that provides AI-powered summarization features.
+This project was inspired by [linuxdo-scripts](https://github.com/anghunk/linuxdo-scripts), a feature-rich browser extension designed to enhance the LinuxDo forum experience. It integrates a wide range of practical features — from basic UI optimizations to advanced AI-powered assistance — making forum browsing and interaction smoother and more efficient.
 
 ## License
 

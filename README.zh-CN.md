@@ -178,7 +178,7 @@ registerHandler('YOUR_TYPE', async (request, sendResponse) => { ... });
 
 ## 灵感来源
 
-本项目灵感来源于 [linuxdo-scripts](https://github.com/anghunk/linuxdo-scripts)，一个为 LinuxDo 论坛提供 AI 总结功能的优秀浏览器扩展。
+本项目灵感来源于 [linuxdo-scripts](https://github.com/anghunk/linuxdo-scripts)。LinuxDo Scripts 是一个功能丰富的浏览器扩展，专为提升 LinuxDo 论坛的使用体验而设计。它集成了从基础界面优化到高级 AI 辅助的多项实用功能，让您的论坛浏览和互动体验更加流畅高效。
 
 ## 许可证
 
