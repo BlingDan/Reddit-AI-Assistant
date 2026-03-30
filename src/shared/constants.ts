@@ -15,12 +15,14 @@ export const DEFAULT_SETTINGS = {
 export const SUMMARY_COLORS = {
   post: {
     bg: '#f0f0ff',
+    bgDark: '#1e1b4b',
     header: '#6366f1',
     headerText: '#ffffff',
     label: 'AI Summary',
   },
   comments: {
     bg: '#f0fdf4',
+    bgDark: '#052e16',
     header: '#22c55e',
     headerText: '#ffffff',
     label: 'Comment Summary',

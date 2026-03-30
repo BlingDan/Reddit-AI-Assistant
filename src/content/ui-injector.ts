@@ -5,6 +5,7 @@ import { getFullPostContent, getCommentsContent, findActionBar } from './dom-ada
 let panelContainer: HTMLElement | null = null;
 let injected = false;
 let lastUrl = '';
+let currentFullText = '';
 
 function createStyleSheet(): HTMLStyleElement {
   const style = document.createElement('style');
@@ -248,13 +249,13 @@ function summarize(type: 'post' | 'comments'): void {
   }
 
   document.querySelectorAll('.raa-btn').forEach((btn) => ((btn as HTMLButtonElement).disabled = true));
+  currentFullText = '';
   showPanel(type, '');
   setLoading(true);
 
   const msgType = type === 'post' ? 'SUMMARIZE_POST' : 'SUMMARIZE_COMMENTS';
   const colors = SUMMARY_COLORS[type];
 
-  let fullText = '';
   let renderTimer: ReturnType<typeof setTimeout> | null = null;
 
   const port = chrome.runtime.connect({ name: 'summarize' });
@@ -262,12 +263,12 @@ function summarize(type: 'post' | 'comments'): void {
 
   port.onMessage.addListener((msg: { type: string; token?: string; fullText?: string; message?: string; code?: string; totalTokens?: number }) => {
     if (msg.type === 'STREAM_TOKEN' && msg.token) {
-      fullText += msg.token;
+      currentFullText += msg.token;
       // Batch markdown re-renders to ~100ms intervals for performance
       if (!renderTimer) {
         renderTimer = setTimeout(() => {
           renderTimer = null;
-          updatePanelBodyStreaming(fullText, colors.bg);
+          updatePanelBodyStreaming(currentFullText, colors.bg);
         }, 300);
       }
     } else if (msg.type === 'STREAM_DONE') {
@@ -275,9 +276,9 @@ function summarize(type: 'post' | 'comments'): void {
         clearTimeout(renderTimer);
         renderTimer = null;
       }
-      updatePanelBody(fullText || msg.fullText || '', colors.bg);
+      updatePanelBody(currentFullText || msg.fullText || '', colors.bg);
       if (msg.totalTokens !== undefined) {
-        showFooter(`Tokens: ${msg.totalTokens}`);
+        showFooter(`Tokens: ${msg.totalTokens}`, currentFullText || msg.fullText || '');
       }
       enableButtons();
       port.disconnect();
@@ -304,20 +305,33 @@ function summarize(type: 'post' | 'comments'): void {
 
 function showPanel(type: 'post' | 'comments' | null, text: string, isError = false): void {
   removePanel();
-
   const colors = type ? SUMMARY_COLORS[type] : SUMMARY_COLORS.post;
+  const isDark = detectDarkMode();
+  const bgColor = isDark ? colors.bgDark : colors.bg;
+
   panelContainer = document.createElement('div');
   panelContainer.className = 'raa-panel';
+  if (isDark) panelContainer.classList.add('raa-dark');
 
   const header = document.createElement('div');
   header.className = 'raa-panel__header';
   header.style.background = colors.header;
   header.style.color = colors.headerText;
-  header.textContent = colors.label;
+  const headerLeft = document.createElement('span');
+  headerLeft.textContent = colors.label;
+  const headerRight = document.createElement('span');
+  headerRight.style.cssText = 'display:flex;align-items:center;';
+  const collapseIcon = document.createElement('span');
+  collapseIcon.className = 'raa-panel__collapse-icon';
+  collapseIcon.textContent = '\u25BC';
+  headerRight.appendChild(collapseIcon);
+  header.appendChild(headerLeft);
+  header.appendChild(headerRight);
+  header.addEventListener('click', () => panelContainer?.classList.toggle('raa-panel--collapsed'));
 
   const body = document.createElement('div');
   body.className = 'raa-panel__body';
-  body.style.background = colors.bg;
+  body.style.background = bgColor;
   body.id = 'raa-panel-body';
 
   if (isError) {
@@ -335,23 +349,22 @@ function showPanel(type: 'post' | 'comments' | null, text: string, isError = fal
   panelContainer.appendChild(header);
   panelContainer.appendChild(body);
 
-  // Insert panel after the button row, inside the injection container
   const btnGroup = document.querySelector('.raa-buttons');
   if (btnGroup?.parentElement) {
     btnGroup.parentElement.appendChild(panelContainer);
   } else {
     const actionBar = findActionBar();
-    if (actionBar) {
-      actionBar.appendChild(panelContainer);
-    }
+    if (actionBar) actionBar.appendChild(panelContainer);
   }
 }
 
-function updatePanelBody(text: string, bg: string): void {
+function updatePanelBody(text: string, _bg: string): void {
   const body = document.getElementById('raa-panel-body');
   if (body) {
     body.innerHTML = marked.parse(text) as string;
-    body.style.background = bg;
+    const isDark = detectDarkMode();
+    const colors = _bg === SUMMARY_COLORS.post.bg ? SUMMARY_COLORS.post : SUMMARY_COLORS.comments;
+    body.style.background = isDark ? colors.bgDark : _bg;
     setLoading(false);
   }
 }
@@ -376,24 +389,39 @@ function updatePanelBodyStreaming(text: string, _bg: string): void {
 function setLoading(loading: boolean): void {
   const body = document.getElementById('raa-panel-body');
   if (!body) return;
-
-  const existing = body.querySelector('.raa-spinner');
-  if (loading && !existing) {
-    body.textContent = 'Summarizing...';
-    const spinner = document.createElement('span');
-    spinner.className = 'raa-spinner';
-    body.appendChild(spinner);
-  } else if (!loading && existing) {
-    existing.remove();
+  if (loading) {
+    if (!body.querySelector('.raa-shimmer')) {
+      body.innerHTML = '<div class="raa-shimmer"></div>';
+    }
   }
 }
 
-function showFooter(text: string): void {
+function showFooter(text: string, copyText?: string): void {
   removeFooter();
   const footer = document.createElement('div');
   footer.className = 'raa-panel__footer';
   footer.id = 'raa-panel-footer';
-  footer.textContent = text;
+  footer.style.cssText = 'display:flex;align-items:center;justify-content:space-between;';
+
+  const tokenSpan = document.createElement('span');
+  tokenSpan.textContent = text;
+  footer.appendChild(tokenSpan);
+
+  if (copyText) {
+    const copyBtn = document.createElement('button');
+    copyBtn.textContent = 'Copy';
+    copyBtn.style.cssText = 'background:none;border:1px solid rgba(0,0,0,0.2);color:rgba(0,0,0,0.5);padding:2px 8px;border-radius:4px;cursor:pointer;font-size:11px;';
+    copyBtn.addEventListener('click', () => {
+      navigator.clipboard.writeText(copyText).then(() => {
+        copyBtn.textContent = 'Copied!';
+        copyBtn.style.color = '#4ade80';
+        copyBtn.style.borderColor = '#4ade80';
+        setTimeout(() => { copyBtn.textContent = 'Copy'; copyBtn.style.color = 'rgba(0,0,0,0.5)'; copyBtn.style.borderColor = 'rgba(0,0,0,0.2)'; }, 2000);
+      });
+    });
+    footer.appendChild(copyBtn);
+  }
+
   panelContainer?.appendChild(footer);
 }
 
