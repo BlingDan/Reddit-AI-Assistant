@@ -1,5 +1,13 @@
 <template>
   <div class="field-group">
+    <div class="preset-bar">
+      <span class="preset-label">Language Preset:</span>
+      <div class="preset-buttons">
+        <button :class="['btn-preset', preset === 'en' ? 'active' : '']" @click="applyPreset('en')">English</button>
+        <button :class="['btn-preset', preset === 'zh' ? 'active' : '']" @click="applyPreset('zh')">中文</button>
+      </div>
+    </div>
+
     <label>Post Summary Prompt</label>
     <textarea v-model="postPrompt" rows="4" />
     <button class="btn-link" @click="postPrompt = DEFAULT_POST_PROMPT">Reset to default</button>
@@ -18,10 +26,11 @@
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue';
-import { DEFAULT_POST_PROMPT, DEFAULT_COMMENT_PROMPT } from '@/shared/constants';
+import { DEFAULT_POST_PROMPT, DEFAULT_COMMENT_PROMPT, DEFAULT_POST_PROMPT_ZH, DEFAULT_COMMENT_PROMPT_ZH } from '@/shared/constants';
 
 const postPrompt = ref(DEFAULT_POST_PROMPT);
 const commentPrompt = ref(DEFAULT_COMMENT_PROMPT);
+const preset = ref<'en' | 'zh'>('en');
 const saving = ref(false);
 const message = ref('');
 const messageType = ref<'success' | 'error'>('success');
@@ -52,6 +61,17 @@ async function save() {
   }
   saving.value = false;
 }
+
+function applyPreset(lang: 'en' | 'zh') {
+  preset.value = lang;
+  if (lang === 'en') {
+    postPrompt.value = DEFAULT_POST_PROMPT;
+    commentPrompt.value = DEFAULT_COMMENT_PROMPT;
+  } else {
+    postPrompt.value = DEFAULT_POST_PROMPT_ZH;
+    commentPrompt.value = DEFAULT_COMMENT_PROMPT_ZH;
+  }
+}
 </script>
 
 <style scoped>
@@ -59,6 +79,46 @@ async function save() {
   display: flex;
   flex-direction: column;
   gap: 4px;
+}
+.preset-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+.preset-label {
+  font-size: 13px;
+  color: #6b7280;
+}
+.preset-buttons {
+  display: flex;
+  gap: 0;
+}
+.btn-preset {
+  padding: 6px 16px;
+  border: 1px solid #d1d5db;
+  background: white;
+  cursor: pointer;
+  font-size: 13px;
+  color: #374151;
+}
+.btn-preset:first-child {
+  border-radius: 6px 0 0 6px;
+}
+.btn-preset:last-child {
+  border-radius: 0 6px 6px 0;
+  border-left: none;
+}
+.btn-preset:hover {
+  background: #f3f4f6;
+}
+.btn-preset.active {
+  background: #6366f1;
+  color: white;
+  border-color: #6366f1;
+}
+.btn-preset.active + .btn-preset {
+  border-left: 1px solid #6366f1;
 }
 label {
   font-size: 13px;

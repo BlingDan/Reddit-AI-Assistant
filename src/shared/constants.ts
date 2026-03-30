@@ -22,6 +22,30 @@ Note: Comments are grouped by discussion threads (parent comment + replies). Con
 
 {content}`;
 
+export const DEFAULT_POST_PROMPT_ZH =
+  `请总结以下 Reddit 帖子，使用 markdown 格式返回。通过编号列表（1, 2, 3...）列出核心要点。文字精炼、简洁、准确，无字数限制。不要输出标题（如"总结"、"核心要点"等），直接输出正文内容。请使用简体中文回复。
+
+{content}`;
+
+export const DEFAULT_COMMENT_PROMPT_ZH =
+  `分析以下 Reddit 讨论帖子，请使用简体中文回复。按以下结构输出：
+
+**摘要：** 2-3 句话概括讨论的核心话题和结论。
+
+**主要主题：** 用编号列表列出 2-4 个主要讨论主题。
+
+**共识：** 大多数评论者同意的观点（1-2 句话）。
+
+**主要争议：** 关键分歧或对立观点，简要说明各方立场。
+
+**代表性评论：** 引用 2-3 条有代表性的评论（附用户名），简述每条的代表性和价值。
+
+**整体氛围：** 从以下选项中选择一个：偏积极、褒贬不一、偏消极、或中立 — 并简要说明。
+
+注意：评论按讨论线程分组（主评论 + 回复），请结合线程上下文分析关系和争议。
+
+{content}`;
+
 export const DEFAULT_SETTINGS = {
   endpoint: 'https://api.openai.com/v1/chat/completions',
   apiKey: '',
