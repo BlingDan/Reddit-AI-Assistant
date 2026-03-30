@@ -241,47 +241,56 @@ function findPostAuthor(): string {
 function extractComments(): Comment[] {
   const comments: Comment[] = [];
 
-  // Strategy 1: shreddit-comment custom elements
+  // Strategy 1: shreddit-comment custom elements (thread-aware)
   const shredditComments = document.querySelectorAll('shreddit-comment');
   if (shredditComments.length > 0) {
+    // Find top-level comments (not nested inside other comments)
+    const topLevelComments: Element[] = [];
+
     shredditComments.forEach((el) => {
-      const author = el.getAttribute('author') || '';
-      const score = parseInt(el.getAttribute('score') || '0', 10);
-
-      // Comment body is in [slot="comment"] > .md
-      let text = '';
-      const commentSlot = el.querySelector('[slot="comment"]');
-      if (commentSlot) {
-        const cleanSlot = stripMediaElements(commentSlot);
-        const md = cleanSlot.querySelector('.md');
-        if (md?.textContent?.trim()) {
-          text = md.textContent.trim();
-        } else {
-          // Fallback to paragraphs
-          const ps = cleanSlot.querySelectorAll('p');
-          for (const p of ps) {
-            const pText = p.textContent?.trim() || '';
-            if (pText.length > 0) {
-              text += (text ? '\n' : '') + pText;
-            }
-          }
-        }
-      }
-
-      // Avoid duplicating nested child comments (only top-level slot content)
-      if (!text) {
-        const md = el.querySelector('[slot="comment"] .md');
-        if (md?.textContent?.trim()) text = md.textContent.trim();
-      }
-
-      if (text) {
-        comments.push({ author, text, score });
+      // A top-level comment is NOT inside another shreddit-comment
+      const parentComment = el.parentElement?.closest('shreddit-comment');
+      if (!parentComment) {
+        topLevelComments.push(el);
       }
     });
+
+    topLevelComments.forEach((el) => {
+      const comment = extractSingleComment(el as HTMLElement);
+      if (comment) {
+        // Extract replies (child shreddit-comment elements)
+        const childComments = el.querySelectorAll(':scope shreddit-comment');
+        if (childComments.length > 0) {
+          comment.replies = [];
+          childComments.forEach((child) => {
+            const childComment = extractSingleComment(child as HTMLElement);
+            if (childComment) {
+              // One more level of nested replies
+              const nestedChildren = child.querySelectorAll(':scope shreddit-comment');
+              if (nestedChildren.length > 0) {
+                childComment.replies = [];
+                nestedChildren.forEach((nested) => {
+                  const nestedComment = extractSingleComment(nested as HTMLElement);
+                  if (nestedComment) {
+                    childComment.replies!.push(nestedComment);
+                  }
+                });
+                childComment.replies!.sort((a, b) => (b.score ?? 0) - (a.score ?? 0));
+              }
+              comment.replies!.push(childComment);
+            }
+          });
+          comment.replies!.sort((a, b) => (b.score ?? 0) - (a.score ?? 0));
+        }
+        comments.push(comment);
+      }
+    });
+
+    comments.sort((a, b) => (b.score ?? 0) - (a.score ?? 0));
     return comments;
   }
 
-  // Strategy 2: Legacy comment selectors
+  // Strategy 2: Legacy comment selectors (flat, no threads)
   const commentContainers = document.querySelectorAll(
     '[data-testid="comment"], [id^="comment-tree-comment-node"]',
   );
@@ -302,6 +311,40 @@ function extractComments(): Comment[] {
   });
 
   return comments;
+}
+
+/** Extract a single comment from a shreddit-comment element */
+function extractSingleComment(el: HTMLElement): Comment | null {
+  const author = el.getAttribute('author') || '';
+  const score = parseInt(el.getAttribute('score') || '0', 10);
+
+  let text = '';
+  const commentSlot = el.querySelector('[slot="comment"]');
+  if (commentSlot) {
+    const cleanSlot = stripMediaElements(commentSlot);
+    const md = cleanSlot.querySelector('.md');
+    if (md?.textContent?.trim()) {
+      text = md.textContent.trim();
+    } else {
+      const ps = cleanSlot.querySelectorAll('p');
+      for (const p of ps) {
+        const pText = p.textContent?.trim() || '';
+        if (pText.length > 0) {
+          text += (text ? '\n' : '') + pText;
+        }
+      }
+    }
+  }
+
+  if (!text) {
+    const md = el.querySelector('[slot="comment"] .md');
+    if (md?.textContent?.trim()) text = md.textContent.trim();
+  }
+
+  if (text) {
+    return { author, text, score };
+  }
+  return null;
 }
 
 export { findActionBar, findPostTitle, findPostBody, findPostAuthor, extractComments };
@@ -345,14 +388,37 @@ export function getCommentsContent(): string {
   // Sort by score descending
   comments.sort((a, b) => (b.score ?? 0) - (a.score ?? 0));
 
-  // Limit to top comments to keep input manageable, but keep full content
-  const MAX_COMMENTS = 50;
-  const limited = comments.slice(0, MAX_COMMENTS);
+  // Limit to top threads (with their replies) to keep input manageable
+  const MAX_THREADS = 20;
+  const limited = comments.slice(0, MAX_THREADS);
 
-  let content = `Post: ${title}\n\nComments (top ${limited.length} of ${comments.length} by score):\n`;
+  let content = `Post: ${title}\n\nDiscussion Threads (top ${limited.length} by score):\n`;
+
   limited.forEach((c, i) => {
-    content += `\n---\n[${i + 1}] ${c.author} (score: ${c.score}):\n${stripImageUrls(c.text)}`;
+    content += formatCommentThread(c, i + 1, 0);
   });
 
   return content;
+}
+
+/** Format a comment thread with indentation for replies */
+function formatCommentThread(comment: Comment, threadNum: number, depth: number): string {
+  const indent = depth === 0 ? '' : '  '.repeat(depth) + '\u21B3 ';
+  const prefix = depth === 0
+    ? `\n---\nThread #${threadNum} \u2014 u/${comment.author} (score: ${comment.score ?? 0}):\n`
+    : `u/${comment.author} (score: ${comment.score ?? 0}): `;
+
+  let output = depth === 0 ? prefix : indent + prefix;
+  output += stripImageUrls(comment.text) + '\n';
+
+  if (comment.replies && comment.replies.length > 0) {
+    const maxReplies = depth === 0 ? 5 : 3;
+    const limitedReplies = comment.replies.slice(0, maxReplies);
+
+    limitedReplies.forEach((reply) => {
+      output += formatCommentThread(reply, threadNum, depth + 1);
+    });
+  }
+
+  return output;
 }
