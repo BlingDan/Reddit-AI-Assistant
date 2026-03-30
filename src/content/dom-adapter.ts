@@ -1,16 +1,94 @@
 import type { Comment } from '@/shared/types';
 
-/** Maximum number of top-level comment threads to include. */
-const MAX_TOP_LEVEL_THREADS = 20;
-/** Maximum number of direct replies per top-level thread. */
-const MAX_DIRECT_REPLIES = 5;
-/** Maximum number of nested replies at deeper levels. */
-const MAX_NESTED_REPLIES = 3;
+/** Maximum total characters for comments content (token budget ~4k tokens) */
+const COMMENT_CHAR_BUDGET = 16000;
+/** Maximum length of a single comment before truncation */
+const MAX_COMMENT_LENGTH = 1000;
+/** Maximum number of top-level threads to consider */
+const MAX_TOP_LEVEL_THREADS = 30;
+
+/** Truncate a comment to a max length, trying to break at sentence boundaries */
+function truncateComment(text: string, maxLen: number): string {
+  if (text.length <= maxLen) return text;
+  const truncated = text.slice(0, maxLen);
+  // Try to break at last sentence boundary
+  const lastPeriod = Math.max(truncated.lastIndexOf('. '), truncated.lastIndexOf('! '), truncated.lastIndexOf('? '));
+  if (lastPeriod > maxLen * 0.5) {
+    return truncated.slice(0, lastPeriod + 1) + ' [...]';
+  }
+  return truncated.trimEnd() + ' [...]';
+}
+
+/** Select comments with diversity — top + middle + low-score representatives */
+function selectDiverseComments(comments: Comment[], budget: number): Comment[] {
+  if (comments.length === 0) return [];
+
+  const selected: Comment[] = [];
+  let usedChars = 0;
+
+  // Tier 1: Top 5 by score (must have)
+  const topTier = comments.slice(0, Math.min(5, comments.length));
+  for (const c of topTier) {
+    const truncated = { ...c, text: truncateComment(c.text, MAX_COMMENT_LENGTH) };
+    const cost = truncated.text.length + 50; // overhead for formatting
+    if (usedChars + cost > budget * 0.5) break;
+    selected.push(truncated);
+    usedChars += cost;
+  }
+
+  // Tier 2: Middle-score comments (next 10)
+  const midStart = topTier.length;
+  const midEnd = Math.min(midStart + 10, comments.length);
+  const midTier = comments.slice(midStart, midEnd);
+  for (const c of midTier) {
+    const truncated = { ...c, text: truncateComment(c.text, MAX_COMMENT_LENGTH) };
+    const cost = truncated.text.length + 50;
+    if (usedChars + cost > budget * 0.8) break;
+    selected.push(truncated);
+    usedChars += cost;
+  }
+
+  // Tier 3: Low-score but diverse (sample from bottom half, up to 5)
+  const bottomStart = Math.floor(comments.length / 2);
+  const bottomTier = comments.slice(bottomStart);
+  // Pick evenly spaced samples for diversity
+  const sampleCount = Math.min(5, bottomTier.length);
+  for (let i = 0; i < sampleCount; i++) {
+    const idx = Math.floor(i * bottomTier.length / sampleCount);
+    const c = bottomTier[idx];
+    const truncated = { ...c, text: truncateComment(c.text, 500) };
+    const cost = truncated.text.length + 50;
+    if (usedChars + cost > budget) break;
+    selected.push(truncated);
+    usedChars += cost;
+  }
+
+  // Sort final selection by score for presentation
+  selected.sort((a, b) => (b.score ?? 0) - (a.score ?? 0));
+  return selected;
+}
+
+export function getCommentsContent(): string {
+  const title = findPostTitle();
+  const allComments = extractComments();
+  const totalComments = allComments.length;
+  const uniqueAuthors = new Set(allComments.map(c => c.author)).size;
+
+  // Select diverse set within budget
+  const selected = selectDiverseComments(allComments, COMMENT_CHAR_BUDGET);
+
+  let content = `Post: ${title}\n`;
+  content += `[Stats: ${totalComments} comments from ${uniqueAuthors} users, showing ${selected.length} representative threads]\n`;
+
+  selected.forEach((c, i) => {
+    content += `\n---\nThread #${i + 1} — u/${c.author} (score: ${c.score ?? 0}):\n${stripImageUrls(c.text)}\n`;
+  });
+
+  return content;
+}
 
 /**
  * Reddit "shreddit" DOM adapter — based on actual page analysis (2026-03).
- *
- * Post detail page (PDP) structure:
  *
  *   <shreddit-post author="username" post-title="..." score="0" id="t3_xxx" ...>
  *     <div slot="credit-bar" id="pdp-credit-bar">
@@ -54,12 +132,13 @@ function findActionBar(): HTMLElement | null {
   // Strategy 1: Find shreddit-post on PDP — insert after it
   const post = document.querySelector('shreddit-post');
   if (post?.parentElement) {
-    // The buttons will be appended to a new container inserted after shreddit-post.
-    // We return a wrapper that we create and insert ourselves.
-    // But to keep the api simple, we return the post's parent and let the caller
-    // insert a container after the post element.
-    // Actually, let's create and return an injection container.
-    return createInjectionContainer(post as HTMLElement);
+    // Check if shreddit-post has actual content (title exists)
+    const title = post.querySelector('h1[slot="title"], [slot="title"]');
+    if (title && title.textContent?.trim()) {
+      return createInjectionContainer(post as HTMLElement);
+    }
+    // shreddit-post exists but content not loaded yet
+    return null;
   }
 
   // Strategy 2: Find share button, walk up to find a button row (feed view)
@@ -248,47 +327,12 @@ function findPostAuthor(): string {
 function extractComments(): Comment[] {
   const comments: Comment[] = [];
 
-  // Strategy 1: shreddit-comment custom elements (thread-aware)
+  // Strategy 1: shreddit-comment custom elements
   const shredditComments = document.querySelectorAll('shreddit-comment');
   if (shredditComments.length > 0) {
-    // Find top-level comments (not nested inside other comments)
-    const topLevelComments: Element[] = [];
-
     shredditComments.forEach((el) => {
-      // A top-level comment is NOT inside another shreddit-comment
-      const parentComment = el.parentElement?.closest('shreddit-comment');
-      if (!parentComment) {
-        topLevelComments.push(el);
-      }
-    });
-
-    topLevelComments.forEach((el) => {
       const comment = extractSingleComment(el as HTMLElement);
       if (comment) {
-        // Extract replies (child shreddit-comment elements)
-        const childComments = el.querySelectorAll(':scope shreddit-comment');
-        if (childComments.length > 0) {
-          comment.replies = [];
-          childComments.forEach((child) => {
-            const childComment = extractSingleComment(child as HTMLElement);
-            if (childComment) {
-              // One more level of nested replies
-              const nestedChildren = child.querySelectorAll(':scope shreddit-comment');
-              if (nestedChildren.length > 0) {
-                childComment.replies = [];
-                nestedChildren.forEach((nested) => {
-                  const nestedComment = extractSingleComment(nested as HTMLElement);
-                  if (nestedComment) {
-                    childComment.replies!.push(nestedComment);
-                  }
-                });
-                childComment.replies!.sort((a, b) => (b.score ?? 0) - (a.score ?? 0));
-              }
-              comment.replies!.push(childComment);
-            }
-          });
-          comment.replies!.sort((a, b) => (b.score ?? 0) - (a.score ?? 0));
-        }
         comments.push(comment);
       }
     });
@@ -386,43 +430,4 @@ export function getFullPostContent(): string {
   let content = `Title: ${title}\nAuthor: ${author}`;
   if (body) content += `\n\n${stripImageUrls(body)}`;
   return content;
-}
-
-export function getCommentsContent(): string {
-  const title = findPostTitle();
-  let comments = extractComments();
-
-  // Limit to top threads (with their replies) to keep input manageable
-  // (extractComments already sorts by score descending)
-  const limited = comments.slice(0, MAX_TOP_LEVEL_THREADS);
-
-  let content = `Post: ${title}\n\nDiscussion Threads (top ${limited.length} by score):\n`;
-
-  limited.forEach((c, i) => {
-    content += formatCommentThread(c, i + 1, 0);
-  });
-
-  return content;
-}
-
-/** Format a comment thread with indentation for replies */
-function formatCommentThread(comment: Comment, threadNum: number, depth: number): string {
-  const indent = depth === 0 ? '' : '  '.repeat(depth) + '\u21B3 ';
-  const prefix = depth === 0
-    ? `\n---\nThread #${threadNum} \u2014 u/${comment.author} (score: ${comment.score ?? 0}):\n`
-    : `u/${comment.author} (score: ${comment.score ?? 0}): `;
-
-  let output = depth === 0 ? prefix : indent + prefix;
-  output += stripImageUrls(comment.text) + '\n';
-
-  if (comment.replies && comment.replies.length > 0) {
-    const maxReplies = depth === 0 ? MAX_DIRECT_REPLIES : MAX_NESTED_REPLIES;
-    const limitedReplies = comment.replies.slice(0, maxReplies);
-
-    limitedReplies.forEach((reply) => {
-      output += formatCommentThread(reply, threadNum, depth + 1);
-    });
-  }
-
-  return output;
 }

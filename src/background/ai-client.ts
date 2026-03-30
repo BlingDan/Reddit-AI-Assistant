@@ -29,7 +29,9 @@ export async function* streamChatCompletion(
     if (response.status === 429) {
       throw new RateLimitError(response.headers.get('retry-after'));
     }
-    throw new ApiError(`API returned ${response.status}: ${body}`, 'API_ERROR');
+    // Provide user-friendly messages for common errors
+    const userMessage = interpretApiError(response.status, body);
+    throw new ApiError(userMessage, 'API_ERROR');
   }
 
   const reader = response.body?.getReader();
@@ -121,6 +123,26 @@ export class ApiError extends Error {
   constructor(message: string, code: string) {
     super(message);
     this.code = code;
+  }
+}
+
+/** Interpret API error status codes into user-friendly messages */
+function interpretApiError(status: number, _body: string): string {
+  switch (status) {
+    case 401:
+      return 'Invalid API key. Please check your API key in settings.';
+    case 403:
+      return 'Access forbidden. Your API key may not have permission for this model.';
+    case 404:
+      return 'Endpoint not found. Please check your API endpoint URL.';
+    case 429:
+      return 'Rate limit reached. Please wait a moment and try again.';
+    case 500:
+    case 502:
+    case 503:
+      return 'API server error. The service may be temporarily unavailable.';
+    default:
+      return `API error (${status}). Please check your settings and try again.`;
   }
 }
 

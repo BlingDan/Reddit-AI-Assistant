@@ -1,6 +1,7 @@
 import { marked } from 'marked';
 import { SUMMARY_COLORS } from '@/shared/constants';
 import { getFullPostContent, getCommentsContent, findActionBar } from './dom-adapter';
+import { getPostIdFromUrl, getCachedSummary, setCachedSummary } from './summary-cache';
 
 let panelContainer: HTMLElement | null = null;
 let injected = false;
@@ -267,6 +268,27 @@ function summarize(type: 'post' | 'comments'): void {
     return;
   }
 
+  // Check cache first
+  const postId = getPostIdFromUrl();
+  if (postId) {
+    getCachedSummary(postId, type).then((cached) => {
+      if (cached) {
+        currentFullText = cached.summary;
+        showPanel(type, '');
+        updatePanelBody(cached.summary, SUMMARY_COLORS[type].bg);
+        showFooter(`Tokens: ${cached.tokens} (cached)`, cached.summary);
+        enableButtons();
+        return;
+      }
+      // No cache, proceed with streaming
+      startStreaming(type, content);
+    });
+  } else {
+    startStreaming(type, content);
+  }
+}
+
+function startStreaming(type: 'post' | 'comments', content: string): void {
   document.querySelectorAll('.raa-btn').forEach((btn) => ((btn as HTMLButtonElement).disabled = true));
   currentFullText = '';
   showPanel(type, '');
@@ -276,6 +298,7 @@ function summarize(type: 'post' | 'comments'): void {
   const colors = SUMMARY_COLORS[type];
 
   let renderTimer: ReturnType<typeof setTimeout> | null = null;
+  let tokenCount = 0;
 
   const port = chrome.runtime.connect({ name: 'summarize' });
   port.postMessage({ type: msgType, content });
@@ -283,23 +306,35 @@ function summarize(type: 'post' | 'comments'): void {
   port.onMessage.addListener((msg: { type: string; token?: string; fullText?: string; message?: string; code?: string; totalTokens?: number }) => {
     if (msg.type === 'STREAM_TOKEN' && msg.token) {
       currentFullText += msg.token;
-      // Batch markdown re-renders to ~100ms intervals for performance
+      tokenCount++;
+
+      // Dynamic render interval: more tokens = less frequent rendering
+      const renderInterval = tokenCount < 200 ? 600 : tokenCount < 500 ? 1000 : 1500;
+
       if (!renderTimer) {
         renderTimer = setTimeout(() => {
           renderTimer = null;
-          updatePanelBodyStreaming(currentFullText, colors.bg);
-        }, 300);
+          updatePanelBodyMarkdown(currentFullText, colors.bg);
+        }, renderInterval);
       }
     } else if (msg.type === 'STREAM_DONE') {
       if (renderTimer) {
         clearTimeout(renderTimer);
         renderTimer = null;
       }
-      updatePanelBody(currentFullText || msg.fullText || '', colors.bg);
+      const finalText = currentFullText || msg.fullText || '';
+      updatePanelBody(finalText, colors.bg);
       if (msg.totalTokens !== undefined) {
-        showFooter(`Tokens: ${msg.totalTokens}`, currentFullText || msg.fullText || '');
+        showFooter(`Tokens: ${msg.totalTokens}`, finalText);
       }
       enableButtons();
+
+      // Cache the result
+      const postId = getPostIdFromUrl();
+      if (postId) {
+        setCachedSummary(postId, type, finalText, msg.totalTokens ?? 0);
+      }
+
       port.disconnect();
     } else if (msg.type === 'ERROR') {
       if (renderTimer) {
@@ -388,21 +423,17 @@ function updatePanelBody(text: string, _bg: string): void {
   }
 }
 
-/** Update panel body during streaming — plain text append, no markdown re-render */
+/** Update panel body during streaming — incremental markdown rendering */
 function updatePanelBodyStreaming(text: string, _bg: string): void {
   const body = document.getElementById('raa-panel-body');
   if (!body) return;
 
-  // Use a pre element for fast plain-text rendering during streaming
-  let pre = body.querySelector('.raa-streaming-text') as HTMLPreElement | null;
-  if (!pre) {
-    body.innerHTML = '';
-    pre = document.createElement('pre');
-    pre.className = 'raa-streaming-text';
-    pre.style.cssText = 'margin:0;padding:0;white-space:pre-wrap;word-wrap:break-word;font-family:inherit;font-size:inherit;line-height:inherit;';
-    body.appendChild(pre);
-  }
-  pre.textContent = text;
+  // Render markdown incrementally during streaming
+  body.innerHTML = marked.parse(text) as string;
+  body.style.background = _bg;
+
+  // Auto-scroll to bottom
+  body.scrollTop = body.scrollHeight;
 }
 
 function setLoading(loading: boolean): void {
