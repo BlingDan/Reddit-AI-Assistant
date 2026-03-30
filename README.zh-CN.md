@@ -176,6 +176,10 @@ registerHandler('YOUR_TYPE', async (request, sendResponse) => { ... });
 // 3. 在 content/ui-injector.ts 中添加 UI 触发器
 ```
 
+## 灵感来源
+
+本项目灵感来源于 [linuxdo-scripts](https://github.com/anghunk/linuxdo-scripts)，一个为 LinuxDo 论坛提供 AI 总结功能的优秀浏览器扩展。
+
 ## 许可证
 
 [MIT](LICENSE)
