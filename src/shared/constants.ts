@@ -1,8 +1,30 @@
 export const DEFAULT_POST_PROMPT =
-  'Summarize the following Reddit post concisely. Capture the key point, context, and any questions being asked. Keep it under 3 sentences.\n\n{content}';
+  `Summarize the following Reddit post. Provide your response in this format:
+
+**Key Point:** One sentence capturing the main idea or question.
+**Context:** 1-2 sentences of necessary background.
+**Questions Asked:** List any explicit questions (or "None" if not applicable).
+
+Keep the summary concise and under 4 sentences total.
+
+{content}`;
 
 export const DEFAULT_COMMENT_PROMPT =
-  'Analyze the following Reddit comment thread. Identify the main themes, areas of consensus, notable disagreements, and the overall sentiment. Structure the summary with clear sections: Top Themes, Consensus, Notable Debate.\n\n{content}';
+  `Analyze the following Reddit comment thread. Provide your response in this format:
+
+## Top Themes
+- List 2-4 main discussion themes as bullet points
+
+## Consensus
+What most commenters agree on (1-2 sentences)
+
+## Notable Debate
+Key disagreement or contrasting viewpoints (1-2 sentences)
+
+## Overall Sentiment
+One of: Mostly Positive, Mixed, Mostly Negative, or Neutral — with a brief explanation
+
+{content}`;
 
 export const DEFAULT_SETTINGS = {
   endpoint: 'https://api.openai.com/v1/chat/completions',
