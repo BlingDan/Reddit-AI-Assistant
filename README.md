@@ -176,6 +176,10 @@ registerHandler('YOUR_TYPE', async (request, sendResponse) => { ... });
 // 3. Add UI triggers in content/ui-injector.ts
 ```
 
+## Inspiration
+
+This project was inspired by [linuxdo-scripts](https://github.com/anghunk/linuxdo-scripts), an excellent browser extension for the LinuxDo forum that provides AI-powered summarization features.
+
 ## License
 
 [MIT](LICENSE)
