@@ -12,7 +12,7 @@ export function buildCommentPrompt(content: string, customPrompt?: string): stri
 
 export function getSystemPrompt(type: 'post' | 'comments'): string | undefined {
   if (type === 'post') {
-    return 'You are summarizing Reddit posts. Be concise and factual. Use markdown formatting (bold, headers) for structure. Focus on extracting the key information a reader needs.';
+    return 'You are summarizing Reddit posts. Use numbered lists for key points. Be concise, factual, and structured. Output in markdown without adding section headers.';
   }
-  return 'You are analyzing Reddit comments. Be concise and structured. Use markdown headers and bullet points for clarity. Focus on the most important themes and insights.';
+  return 'You are analyzing Reddit comment threads. Maintain objectivity and fairness. Focus on substantive content analysis. Distinguish facts from opinions. Use markdown formatting for structure.';
 }
