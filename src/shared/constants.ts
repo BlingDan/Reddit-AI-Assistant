@@ -1,28 +1,24 @@
 export const DEFAULT_POST_PROMPT =
-  `Summarize the following Reddit post. Provide your response in this format:
-
-**Key Point:** One sentence capturing the main idea or question.
-**Context:** 1-2 sentences of necessary background.
-**Questions Asked:** List any explicit questions (or "None" if not applicable).
-
-Keep the summary concise and under 4 sentences total.
+  `Summarize the following Reddit post in markdown format. Use numbered points (1, 2, 3...) to list key takeaways. Be concise and accurate — no word limit but text should be refined. Do not output a header/title like "Summary" or "Key Points" — start with content directly.
 
 {content}`;
 
 export const DEFAULT_COMMENT_PROMPT =
-  `Analyze the following Reddit comment thread. Provide your response in this format:
+  `Analyze the following Reddit discussion threads. Provide your response in this structured format:
 
-## Top Themes
-- List 2-4 main discussion themes as bullet points
+**Summary:** 2-3 sentences capturing the core discussion topic and outcome.
 
-## Consensus
-What most commenters agree on (1-2 sentences)
+**Key Themes:** Use numbered list (1, 2, 3...) for 2-4 main discussion themes.
 
-## Notable Debate
-Key disagreement or contrasting viewpoints (1-2 sentences)
+**Consensus:** What most commenters agree on (1-2 sentences).
 
-## Overall Sentiment
-One of: Mostly Positive, Mixed, Mostly Negative, or Neutral — with a brief explanation
+**Notable Debate:** Key disagreement or contrasting viewpoints with brief context on each stance.
+
+**Representative Comments:** Quote 2-3 noteworthy comments with username, explaining why each is significant.
+
+**Overall Sentiment:** One of: Mostly Positive, Mixed, Mostly Negative, or Neutral — with a brief explanation.
+
+Note: Comments are grouped by discussion threads (parent comment + replies). Consider thread context when analyzing relationships, debates, and sentiment.
 
 {content}`;
 
