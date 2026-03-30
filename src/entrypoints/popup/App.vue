@@ -1,5 +1,5 @@
 <template>
-  <div class="popup">
+  <div class="popup" @mousedown="onMouseDown">
     <div class="popup-header">
       <div class="popup-logo">
         <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
@@ -37,7 +37,7 @@
     </div>
     <div class="popup-footer">
       <button class="btn-link" @click="openOptions">Edit Prompts</button>
-      <a href="https://github.com/user/reddit-ai-assistant" target="_blank" class="footer-link">GitHub</a>
+      <a href="https://github.com/BlingDan/Reddit-AI-Assistant" target="_blank" class="footer-link">GitHub</a>
     </div>
     <p v-if="msg" :class="['msg', msgType]">{{ msg }}</p>
   </div>
@@ -66,6 +66,19 @@ onMounted(async () => {
 });
 
 async function save() {
+  // Validate HTTPS
+  try {
+    const url = new URL(endpoint.value);
+    if (url.protocol !== 'https:' && url.hostname !== 'localhost' && url.hostname !== '127.0.0.1') {
+      msg.value = 'Endpoint must use HTTPS for security';
+      msgType.value = 'err';
+      return;
+    }
+  } catch {
+    msg.value = 'Invalid endpoint URL';
+    msgType.value = 'err';
+    return;
+  }
   const r = await chrome.storage.local.get(KEY);
   await chrome.storage.local.set({
     [KEY]: { ...(r[KEY] || {}), endpoint: endpoint.value, apiKey: apiKey.value, model: model.value },
@@ -103,12 +116,21 @@ function fetchModelList() {
 function openOptions() {
   chrome.runtime.openOptionsPage();
 }
+
+function onMouseDown(e: MouseEvent) {
+  // Prevent popup from closing when selecting text in inputs
+  const target = e.target as HTMLElement;
+  if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.tagName === 'SELECT') {
+    e.stopPropagation();
+  }
+}
 </script>
 
 <style>
 * { margin: 0; padding: 0; box-sizing: border-box; }
 body { width: 340px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
-.popup { padding: 16px; }
+.popup { padding: 16px; user-select: none; -webkit-user-select: none; }
+.popup input, .popup textarea, .popup select { user-select: text; -webkit-user-select: text; }
 .popup-header { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
 .popup-title strong { font-size: 14px; display: block; }
 .version { font-size: 11px; color: #9ca3af; }

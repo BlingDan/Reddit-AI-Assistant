@@ -1,5 +1,23 @@
 import type { Settings } from '@/shared/types';
 
+const FETCH_TIMEOUT_MS = 30000;
+
+async function fetchWithTimeout(url: string, options: RequestInit): Promise<Response> {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+  try {
+    const response = await fetch(url, { ...options, signal: controller.signal });
+    clearTimeout(timeoutId);
+    return response;
+  } catch (err) {
+    clearTimeout(timeoutId);
+    if (err instanceof Error && err.name === 'AbortError') {
+      throw new ApiError('Request timed out after 30 seconds', 'TIMEOUT');
+    }
+    throw err;
+  }
+}
+
 export async function* streamChatCompletion(
   settings: Settings,
   prompt: string,
@@ -11,7 +29,7 @@ export async function* streamChatCompletion(
   }
   messages.push({ role: 'user', content: prompt });
 
-  const response = await fetch(settings.endpoint, {
+  const response = await fetchWithTimeout(settings.endpoint, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -29,7 +47,6 @@ export async function* streamChatCompletion(
     if (response.status === 429) {
       throw new RateLimitError(response.headers.get('retry-after'));
     }
-    // Provide user-friendly messages for common errors
     const userMessage = interpretApiError(response.status, body);
     throw new ApiError(userMessage, 'API_ERROR');
   }
@@ -72,7 +89,7 @@ export async function* streamChatCompletion(
 }
 
 export async function testConnection(settings: Settings): Promise<boolean> {
-  const response = await fetch(settings.endpoint, {
+  const response = await fetchWithTimeout(settings.endpoint, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -90,10 +107,9 @@ export async function testConnection(settings: Settings): Promise<boolean> {
 export async function fetchModels(settings: Settings): Promise<string[]> {
   try {
     const url = new URL(settings.endpoint);
-    // Derive models URL: strip /chat/completions suffix, append /models
     url.pathname = url.pathname.replace(/\/chat\/completions\/?$/, '') + '/models';
 
-    const response = await fetch(url.toString(), {
+    const response = await fetchWithTimeout(url.toString(), {
       method: 'GET',
       headers: { Authorization: `Bearer ${settings.apiKey}` },
     });
@@ -103,18 +119,16 @@ export async function fetchModels(settings: Settings): Promise<string[]> {
     }
 
     const data = await response.json();
-    // OpenAI format: { data: [{ id: "gpt-4", ... }] }
     if (Array.isArray(data.data)) {
       return data.data.map((m: { id: string }) => m.id).filter(Boolean).sort();
     }
-    // Some providers return a flat array
     if (Array.isArray(data)) {
       return data.map((m: { id: string } | string) => (typeof m === 'string' ? m : m.id)).filter(Boolean).sort();
     }
     return [];
   } catch (err) {
     if (err instanceof ApiError) throw err;
-    throw new ApiError(`Failed to fetch models: ${err instanceof Error ? err.message : 'Unknown error'}`, 'API_ERROR');
+    throw new ApiError('Failed to fetch models', 'API_ERROR');
   }
 }
 
@@ -144,6 +158,18 @@ function interpretApiError(status: number, _body: string): string {
     default:
       return `API error (${status}). Please check your settings and try again.`;
   }
+}
+
+/** Sanitize network errors to avoid leaking internal details */
+export function sanitizeError(err: unknown): ApiError {
+  if (err instanceof ApiError) return err;
+  if (err instanceof Error && err.name === 'AbortError') {
+    return new ApiError('Request timed out', 'TIMEOUT');
+  }
+  if (err instanceof TypeError) {
+    return new ApiError('Network error. Please check your internet connection.', 'NETWORK');
+  }
+  return new ApiError('An unexpected error occurred', 'UNKNOWN');
 }
 
 export class RateLimitError extends ApiError {

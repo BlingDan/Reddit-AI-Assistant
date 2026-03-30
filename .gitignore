@@ -1,4 +1,33 @@
+# Dependencies
 node_modules/
+
+# Build outputs
 .output/
 .wxt/
-docs/
+dist/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+npm-debug.log*
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Claude Code / Superpowers
+docs/superpowers/
+.claude/
+
+# Test coverage
+coverage/

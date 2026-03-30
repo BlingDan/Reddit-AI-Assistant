@@ -16,7 +16,7 @@
   <img src="https://img.shields.io/badge/version-1.0.0-blue" alt="version">
   <img src="https://img.shields.io/badge/license-MIT-green" alt="license">
   <img src="https://img.shields.io/badge/Chrome-MV3-yellow" alt="Chrome">
-  <img src="https://img.shields.io/badge/Firefox-MV2-orange" alt="Firefox">
+  <img src="https://img.shields.io/badge/Firefox-MV2-experimental-orange" alt="Firefox">
 </p>
 
 ---
@@ -29,7 +29,7 @@ Summaries stream in real-time, rendered as clean markdown — no waiting for the
 
 **Your API key. Your provider. Zero backend.** All requests go directly from your browser to your configured endpoint. Nothing passes through our servers.
 
-<!-- TODO: Add screenshot: post summary in light mode -->
+![Summarize Post Demo](./public/screenshots/post-summary.png)
 
 ## Features
 
@@ -43,20 +43,21 @@ Summaries stream in real-time, rendered as clean markdown — no waiting for the
 - **BYO API key** — Works with OpenAI, Anthropic via proxy, local models (LM Studio, Ollama), or any OpenAI-compatible endpoint
 - **Model auto-discovery** — Fetch available models from your endpoint with one click
 - **Custom prompts** — Fully editable prompt templates with sensible defaults
-- **Chrome + Firefox** — Supports both Chrome/Edge (Manifest V3) and Firefox (Manifest V2)
+- **Chrome + Firefox** — Supports Chrome/Edge (Manifest V3); Firefox (Manifest V2) is available but not yet fully tested
 
-<!-- TODO: Add screenshots: comment summary, dark mode, popup, onboarding -->
+<!-- Screenshots: comment summary, dark mode, popup, onboarding -->
+<!-- Add your screenshots to a screenshots/ directory -->
 
 ## Installation
 
 ### Chrome Web Store
 
-*Coming soon*
+_Coming soon_
 
 ### Install from Source
 
 ```bash
-git clone https://github.com/user/reddit-ai-assistant.git
+git clone https://github.com/BlingDan/Reddit-AI-Assistant.git
 cd reddit-ai-assistant
 npm install
 npm run build
@@ -69,7 +70,9 @@ Then load in Chrome:
 3. Click **Load unpacked**
 4. Select the `.output/chrome-mv3` directory
 
-### Firefox
+### Firefox (Experimental)
+
+> **Note:** Firefox support has not been fully tested. It may work, but expect potential issues. Feedback and PRs welcome!
 
 ```bash
 npm run build:firefox
@@ -95,13 +98,13 @@ Click the extension icon in your toolbar to open the status dashboard:
 
 Right-click the extension icon → **Options**, or click **Full Settings** from the popup:
 
-| Setting | Default | Description |
-|---|---|---|
-| API Endpoint | `https://api.openai.com/v1/chat/completions` | Any OpenAI-compatible endpoint |
-| API Key | *(empty)* | Stored locally, never sent to third parties |
-| Model | `gpt-4o-mini` | Model name to use |
-| Post Prompt | *(built-in)* | Customizable prompt for post summaries |
-| Comment Prompt | *(built-in)* | Customizable prompt for comment summaries |
+| Setting        | Default                                      | Description                                 |
+| -------------- | -------------------------------------------- | ------------------------------------------- |
+| API Endpoint   | `https://api.openai.com/v1/chat/completions` | Any OpenAI-compatible endpoint              |
+| API Key        | _(empty)_                                    | Stored locally, never sent to third parties |
+| Model          | `gpt-4o-mini`                                | Model name to use                           |
+| Post Prompt    | _(built-in)_                                 | Customizable prompt for post summaries      |
+| Comment Prompt | _(built-in)_                                 | Customizable prompt for comment summaries   |
 
 Use `{content}` as a placeholder for extracted text in custom prompts.
 
@@ -113,11 +116,11 @@ Use `{content}` as a placeholder for extracted text in custom prompts.
 - All API calls go directly from your browser to your configured endpoint
 - No data passes through any third-party server
 
-| Permission | Why |
-|---|---|
-| `storage` | Save API settings and prompt templates locally |
-| `activeTab` | Access current Reddit tab content for summarization |
-| `*://*.reddit.com/*` | Content script injection on Reddit pages only |
+| Permission           | Why                                                 |
+| -------------------- | --------------------------------------------------- |
+| `storage`            | Save API settings and prompt templates locally      |
+| `activeTab`          | Access current Reddit tab content for summarization |
+| `*://*.reddit.com/*` | Content script injection on Reddit pages only       |
 
 No broad host permissions. No remote code.
 

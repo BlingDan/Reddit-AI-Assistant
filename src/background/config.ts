@@ -22,7 +22,10 @@ export function validateApiSettings(settings: Pick<Settings, 'endpoint' | 'apiKe
     return 'API endpoint is required';
   }
   try {
-    new URL(settings.endpoint);
+    const url = new URL(settings.endpoint);
+    if (url.protocol !== 'https:' && url.hostname !== 'localhost' && url.hostname !== '127.0.0.1') {
+      return 'API endpoint must use HTTPS for security';
+    }
   } catch {
     return 'Invalid API endpoint format';
   }

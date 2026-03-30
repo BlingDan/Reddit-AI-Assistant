@@ -1,10 +1,11 @@
 /**
- * Summary cache with LRU eviction.
+ * Summary cache with LRU eviction and lock mechanism.
  * Stores AI summaries keyed by Reddit post ID in chrome.storage.local.
  */
 
 const CACHE_KEY = 'raa-summary-cache';
 const MAX_CACHE_ENTRIES = 50;
+const MAX_CACHE_ENTRY_SIZE = 50000; // 50KB
 
 interface CacheEntry {
   summary: string;
@@ -15,6 +16,28 @@ interface CacheEntry {
 interface CacheStore {
   entries: Record<string, CacheEntry>;
   order: string[];
+}
+
+let cacheLock = false;
+let cacheLockQueue: Array<() => void> = [];
+
+async function acquireCacheLock(): Promise<void> {
+  if (!cacheLock) {
+    cacheLock = true;
+    return;
+  }
+  return new Promise<void>((resolve) => {
+    cacheLockQueue.push(resolve);
+  });
+}
+
+function releaseCacheLock(): void {
+  const next = cacheLockQueue.shift();
+  if (next) {
+    next();
+  } else {
+    cacheLock = false;
+  }
 }
 
 function getStoreKey(postId: string, type: string): string {
@@ -40,17 +63,22 @@ export async function getCachedSummary(
   postId: string,
   type: 'post' | 'comments',
 ): Promise<{ summary: string; tokens: number } | null> {
-  const store = await loadCache();
-  const key = getStoreKey(postId, type);
-  const entry = store.entries[key];
-  if (!entry) return null;
+  await acquireCacheLock();
+  try {
+    const store = await loadCache();
+    const key = getStoreKey(postId, type);
+    const entry = store.entries[key];
+    if (!entry) return null;
 
-  // Move to end of LRU
-  store.order = store.order.filter(k => k !== key);
-  store.order.push(key);
-  await saveCache(store);
+    // Move to end of LRU
+    store.order = store.order.filter(k => k !== key);
+    store.order.push(key);
+    await saveCache(store);
 
-  return { summary: entry.summary, tokens: entry.tokens };
+    return { summary: entry.summary, tokens: entry.tokens };
+  } finally {
+    releaseCacheLock();
+  }
 }
 
 export async function setCachedSummary(
@@ -59,21 +87,31 @@ export async function setCachedSummary(
   summary: string,
   tokens: number,
 ): Promise<void> {
-  const store = await loadCache();
-  const key = getStoreKey(postId, type);
+  // Truncate summary if too large
+  const truncatedSummary = summary.length > MAX_CACHE_ENTRY_SIZE
+    ? summary.slice(0, MAX_CACHE_ENTRY_SIZE) + '... [truncated]'
+    : summary;
 
-  if (store.entries[key]) {
-    store.order = store.order.filter(k => k !== key);
+  await acquireCacheLock();
+  try {
+    const store = await loadCache();
+    const key = getStoreKey(postId, type);
+
+    if (store.entries[key]) {
+      store.order = store.order.filter(k => k !== key);
+    }
+
+    store.entries[key] = { summary: truncatedSummary, tokens, timestamp: Date.now() };
+    store.order.push(key);
+
+    // Evict oldest entries over limit
+    while (store.order.length > MAX_CACHE_ENTRIES) {
+      const oldest = store.order.shift()!;
+      delete store.entries[oldest];
+    }
+
+    await saveCache(store);
+  } finally {
+    releaseCacheLock();
   }
-
-  store.entries[key] = { summary, tokens, timestamp: Date.now() };
-  store.order.push(key);
-
-  // Evict oldest entries over limit
-  while (store.order.length > MAX_CACHE_ENTRIES) {
-    const oldest = store.order.shift()!;
-    delete store.entries[oldest];
-  }
-
-  await saveCache(store);
 }

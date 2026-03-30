@@ -62,6 +62,23 @@ onMounted(async () => {
 async function save() {
   saving.value = true;
   message.value = '';
+
+  // Validate HTTPS
+  try {
+    const url = new URL(settings.endpoint);
+    if (url.protocol !== 'https:' && url.hostname !== 'localhost' && url.hostname !== '127.0.0.1') {
+      message.value = 'Endpoint must use HTTPS for security';
+      messageType.value = 'error';
+      saving.value = false;
+      return;
+    }
+  } catch {
+    message.value = 'Invalid endpoint URL';
+    messageType.value = 'error';
+    saving.value = false;
+    return;
+  }
+
   try {
     const current = (await chrome.storage.local.get(STORAGE_KEY))[STORAGE_KEY] || {};
     await chrome.storage.local.set({

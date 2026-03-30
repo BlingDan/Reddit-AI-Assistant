@@ -3,6 +3,16 @@
   "description": "AI-powered summarization for Reddit posts and comment threads",
   "version": "1.0.0",
   "private": true,
+  "license": "MIT",
+  "author": "Reddit AI Assistant Contributors",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/BlingDan/Reddit-AI-Assistant.git"
+  },
+  "bugs": {
+    "url": "https://github.com/BlingDan/Reddit-AI-Assistant/issues"
+  },
+  "keywords": ["reddit", "ai", "summarization", "browser-extension", "chrome-extension", "openai"],
   "type": "module",
   "scripts": {
     "dev": "wxt",
@@ -14,10 +24,12 @@
     "postinstall": "wxt prepare"
   },
   "dependencies": {
+    "dompurify": "^3.3.3",
     "marked": "^17.0.5",
     "vue": "^3.5.13"
   },
   "devDependencies": {
+    "@types/dompurify": "^3.0.5",
     "@wxt-dev/module-vue": "^1.0.2",
     "typescript": "^5.7.0",
     "wxt": "^0.20.20"

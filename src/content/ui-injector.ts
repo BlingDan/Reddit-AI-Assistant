@@ -1,4 +1,5 @@
 import { marked } from 'marked';
+import DOMPurify from 'dompurify';
 import { SUMMARY_COLORS } from '@/shared/constants';
 import { getFullPostContent, getCommentsContent, findActionBar } from './dom-adapter';
 import { getPostIdFromUrl, getCachedSummary, setCachedSummary } from './summary-cache';
@@ -314,7 +315,7 @@ function startStreaming(type: 'post' | 'comments', content: string): void {
       if (!renderTimer) {
         renderTimer = setTimeout(() => {
           renderTimer = null;
-          updatePanelBodyMarkdown(currentFullText, colors.bg);
+          updatePanelBodyStreaming(currentFullText, colors.bg);
         }, renderInterval);
       }
     } else if (msg.type === 'STREAM_DONE') {
@@ -415,7 +416,7 @@ function showPanel(type: 'post' | 'comments' | null, text: string, isError = fal
 function updatePanelBody(text: string, _bg: string): void {
   const body = document.getElementById('raa-panel-body');
   if (body) {
-    body.innerHTML = marked.parse(text) as string;
+    body.innerHTML = DOMPurify.sanitize(marked.parse(text) as string);
     const isDark = detectDarkMode();
     const colors = _bg === SUMMARY_COLORS.post.bg ? SUMMARY_COLORS.post : SUMMARY_COLORS.comments;
     body.style.background = isDark ? colors.bgDark : _bg;
@@ -428,8 +429,8 @@ function updatePanelBodyStreaming(text: string, _bg: string): void {
   const body = document.getElementById('raa-panel-body');
   if (!body) return;
 
-  // Render markdown incrementally during streaming
-  body.innerHTML = marked.parse(text) as string;
+  // Render markdown incrementally during streaming with XSS protection
+  body.innerHTML = DOMPurify.sanitize(marked.parse(text) as string);
   body.style.background = _bg;
 
   // Auto-scroll to bottom

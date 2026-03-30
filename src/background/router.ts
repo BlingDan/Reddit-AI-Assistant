@@ -13,34 +13,48 @@ type PortHandler = (
 const handlers = new Map<string, Handler>();
 const portHandlers = new Map<string, PortHandler>();
 
+const VALID_HANDLER_TYPES = new Set<string>();
+const VALID_PORT_TYPES = new Set<string>();
+
 export function registerHandler(type: string, handler: Handler): void {
   handlers.set(type, handler);
+  VALID_HANDLER_TYPES.add(type);
 }
 
 export function registerPortHandler(type: string, handler: PortHandler): void {
   portHandlers.set(type, handler);
+  VALID_PORT_TYPES.add(type);
+}
+
+function validateMessageShape(msg: unknown): { type: string; valid: boolean } {
+  if (typeof msg !== 'object' || msg === null) return { type: '', valid: false };
+  const type = (msg as Record<string, unknown>).type;
+  if (typeof type !== 'string') return { type: '', valid: false };
+  return { type, valid: true };
 }
 
 export function startRouter(): void {
-  chrome.runtime.onMessage.addListener((request: CSRequest, _sender, sendResponse) => {
-    const handler = handlers.get(request.type);
-    if (!handler) {
-      sendResponse({ type: 'ERROR', message: `Unknown request type: ${request.type}`, code: 'UNKNOWN_TYPE' });
-      return false; // synchronous
+  chrome.runtime.onMessage.addListener((request: unknown, _sender, sendResponse) => {
+    const { type, valid } = validateMessageShape(request);
+    if (!valid || !VALID_HANDLER_TYPES.has(type)) {
+      sendResponse({ type: 'ERROR', message: `Unknown request type: ${type || 'missing'}`, code: 'UNKNOWN_TYPE' });
+      return false;
     }
 
-    handler(request, sendResponse);
+    const handler = handlers.get(type)!;
+    handler(request as CSRequest, sendResponse);
     return true; // keep channel open for async response
   });
 
   chrome.runtime.onConnect.addListener((port: chrome.runtime.Port) => {
-    port.onMessage.addListener((msg: PortStartMessage) => {
-      const handler = portHandlers.get(msg.type);
-      if (!handler) {
-        port.postMessage({ type: 'ERROR', message: `Unknown port request type: ${msg.type}`, code: 'UNKNOWN_TYPE' });
+    port.onMessage.addListener((msg: unknown) => {
+      const { type, valid } = validateMessageShape(msg);
+      if (!valid || !VALID_PORT_TYPES.has(type)) {
+        port.postMessage({ type: 'ERROR', message: `Unknown port request type: ${type || 'missing'}`, code: 'UNKNOWN_TYPE' } as PortMessage);
         return;
       }
-      handler(msg, port);
+      const handler = portHandlers.get(type)!;
+      handler(msg as PortStartMessage, port);
     });
   });
 }

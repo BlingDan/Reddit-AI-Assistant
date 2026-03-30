@@ -16,7 +16,7 @@
   <img src="https://img.shields.io/badge/version-1.0.0-blue" alt="version">
   <img src="https://img.shields.io/badge/license-MIT-green" alt="license">
   <img src="https://img.shields.io/badge/Chrome-MV3-yellow" alt="Chrome">
-  <img src="https://img.shields.io/badge/Firefox-MV2-orange" alt="Firefox">
+  <img src="https://img.shields.io/badge/Firefox-MV2-实验性-orange" alt="Firefox">
 </p>
 
 ---
@@ -43,7 +43,7 @@
 - **自带 API Key** — 支持 OpenAI、通过代理的 Anthropic、本地模型（LM Studio、Ollama）或任何兼容端点
 - **模型自动发现** — 一键获取端点可用模型列表
 - **自定义提示词** — 完全可编辑的提示词模板，附带合理默认值
-- **Chrome + Firefox** — 同时支持 Chrome/Edge（Manifest V3）和 Firefox（Manifest V2）
+- **Chrome + Firefox** — 支持 Chrome/Edge（Manifest V3）；Firefox（Manifest V2）可用但尚未充分测试
 
 <!-- TODO: 添加截图：评论摘要、深色模式、弹窗、引导页 -->
 
@@ -56,7 +56,7 @@
 ### 从源码安装
 
 ```bash
-git clone https://github.com/user/reddit-ai-assistant.git
+git clone https://github.com/BlingDan/Reddit-AI-Assistant.git
 cd reddit-ai-assistant
 npm install
 npm run build
@@ -69,7 +69,9 @@ npm run build
 3. 点击 **加载已解压的扩展程序**
 4. 选择 `.output/chrome-mv3` 目录
 
-### Firefox
+### Firefox（实验性）
+
+> **注意：** Firefox 支持尚未充分测试，可能存在问题。欢迎反馈和 PR！
 
 ```bash
 npm run build:firefox
