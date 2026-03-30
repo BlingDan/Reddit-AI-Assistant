@@ -200,6 +200,8 @@ function createStyleSheet(): HTMLStyleElement {
 /** Clean up any previously injected UI */
 function cleanup(): void {
   document.getElementById('raa-injection-point')?.remove();
+  document.getElementById('raa-onboarding')?.remove();
+  document.querySelector('.raa-styles')?.remove();
   panelContainer = null;
   injected = false;
 }
@@ -207,8 +209,18 @@ function cleanup(): void {
 function tryInject(): boolean {
   if (injected) return true;
 
+  // Only inject on post detail pages: /r/{subreddit}/comments/{post_id}/...
+  if (!isPostDetailPage()) {
+    return false;
+  }
+
   const actionBar = findActionBar();
-  if (!actionBar) return false;
+  if (!actionBar) {
+    console.log('[Reddit AI Assistant] findActionBar returned null, DOM not ready');
+    return false;
+  }
+
+  console.log('[Reddit AI Assistant] findActionBar found:', actionBar.id || actionBar.className || actionBar.tagName);
 
   if (!document.querySelector('.raa-styles')) {
     const style = createStyleSheet();
@@ -237,7 +249,8 @@ function tryInject(): boolean {
   actionBar.appendChild(btnRow);
 
   injected = true;
-  console.log('[Reddit AI Assistant] Buttons injected');
+  console.log('[Reddit AI Assistant] Buttons injected successfully');
+
   checkOnboarding().then((isReady) => {
     if (!isReady) {
       showOnboardingBanner();
@@ -461,6 +474,12 @@ function enableButtons(): void {
   document.querySelectorAll('.raa-btn').forEach((btn) => ((btn as HTMLButtonElement).disabled = false));
 }
 
+/** Check if current URL is a Reddit post detail page */
+function isPostDetailPage(): boolean {
+  // Post detail pages match: /r/{subreddit}/comments/{post_id}/...
+  return /^\/r\/[^/]+\/comments\//.test(location.pathname);
+}
+
 function detectDarkMode(): boolean {
   if (window.matchMedia('(prefers-color-scheme: dark)').matches) return true;
   const bg = getComputedStyle(document.documentElement).getPropertyValue('--color-neutral-background').trim();
@@ -538,14 +557,25 @@ export function init(): void {
   themeObserver.observe(document.documentElement, { attributes: true, attributeFilter: ['class', 'style'] });
   setupStorageListener();
 
-  // MutationObserver for delayed DOM readiness
+  // MutationObserver for delayed DOM readiness and DOM replacement detection
   let debounceTimer: ReturnType<typeof setTimeout> | null = null;
+
   const observer = new MutationObserver(() => {
     if (debounceTimer) return;
     debounceTimer = setTimeout(() => {
       debounceTimer = null;
-      if (!injected) tryInject();
-    }, 500);
+
+      // Check if our injected UI was removed from DOM (e.g. Reddit SPA replaced it)
+      if (injected && !document.getElementById('raa-injection-point')) {
+        console.log('[Reddit AI Assistant] Injection point removed from DOM, re-injecting');
+        injected = false;
+        panelContainer = null;
+      }
+
+      if (!injected) {
+        tryInject();
+      }
+    }, 300);  // Slightly longer debounce for Reddit's SPA
   });
 
   observer.observe(document.body, { childList: true, subtree: true });
@@ -553,16 +583,21 @@ export function init(): void {
   // Detect SPA navigation (URL change without page reload)
   const checkUrlChange = () => {
     if (location.href !== lastUrl) {
+      const wasOnPostPage = isPostDetailPage();
       lastUrl = location.href;
-      console.log('[Reddit AI Assistant] URL changed, re-injecting');
+      const isNowOnPostPage = isPostDetailPage();
+      console.log('[Reddit AI Assistant] URL changed to:', location.href);
 
       // Clean up old UI
       cleanup();
 
-      // Re-inject after a short delay for DOM to settle
-      setTimeout(() => {
-        if (!injected) tryInject();
-      }, 800);
+      // Only re-inject if we're now on a post detail page
+      // If navigating away from post page, just cleanup and exit
+      if (!isNowOnPostPage) {
+        return;
+      }
+
+      // The MutationObserver will handle re-injection as DOM changes
     }
   };
 

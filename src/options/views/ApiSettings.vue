@@ -76,9 +76,23 @@ async function save() {
   saving.value = false;
 }
 
-function testConn() {
+async function testConn() {
   testing.value = true;
   message.value = '';
+
+  // Save settings first so test uses current values
+  try {
+    const current = (await chrome.storage.local.get(STORAGE_KEY))[STORAGE_KEY] || {};
+    await chrome.storage.local.set({
+      [STORAGE_KEY]: { ...current, ...settings },
+    });
+  } catch {
+    message.value = 'Failed to save settings before test';
+    messageType.value = 'error';
+    testing.value = false;
+    return;
+  }
+
   chrome.runtime.sendMessage({ type: 'TEST_CONNECTION' }, (res) => {
     if (chrome.runtime.lastError) {
       message.value = 'Error: ' + chrome.runtime.lastError.message;
