@@ -1,176 +1,181 @@
-# Reddit AI Assistant
+<p align="center">
+  <img src="public/icon/icon.svg" width="80" height="80" alt="Reddit AI Assistant">
+</p>
 
-A Chrome/Firefox browser extension that adds AI-powered summarization to Reddit posts and comment threads. Uses any OpenAI-compatible API with your own key and custom prompts.
+<h1 align="center">Reddit AI Assistant</h1>
+
+<p align="center">
+  <strong>AI-powered summaries for Reddit posts and comment threads</strong>
+</p>
+
+<p align="center">
+  <a href="README.md">English</a> | <a href="README.zh-CN.md">中文</a>
+</p>
+
+<p align="center">
+  <img src="https://img.shields.io/badge/version-1.0.0-blue" alt="version">
+  <img src="https://img.shields.io/badge/license-MIT-green" alt="license">
+  <img src="https://img.shields.io/badge/Chrome-MV3-yellow" alt="Chrome">
+  <img src="https://img.shields.io/badge/Firefox-MV2-orange" alt="Firefox">
+</p>
+
+---
+
+## What It Does
+
+Add one-click AI summaries to any Reddit post or comment thread. Click **Summarize Post** to extract the key point, context, and questions. Click **Summarize Comments** to see top themes, consensus, debates, and overall sentiment.
+
+Summaries stream in real-time, rendered as clean markdown — no waiting for the full response.
+
+**Your API key. Your provider. Zero backend.** All requests go directly from your browser to your configured endpoint. Nothing passes through our servers.
+
+<!-- TODO: Add screenshot: post summary in light mode -->
 
 ## Features
 
-- **Summarize Post** — One-click AI summary of the original post content
-- **Summarize Comments** — Analyze the entire comment thread for themes, consensus, and debates
-- **Streaming responses** — See the summary appear token-by-token in real time
-- **BYO API key** — Works with OpenAI, or any OpenAI-compatible endpoint (e.g. LiteLLM, Ollama, Azure OpenAI)
-- **Custom prompts** — Fully editable summary prompt templates with sensible defaults
-- **Native feel** — Buttons and panels blend into Reddit's existing UI
+- **One-click summaries** — Summarize posts or comment threads with a single click
+- **Structured output** — Posts get Key Point / Context / Questions; Comments get Themes / Consensus / Debate / Sentiment
+- **Real-time streaming** — Watch the summary appear token-by-token as it's generated
+- **Dark mode** — Automatically follows your Reddit theme (light or dark)
+- **First-run onboarding** — Guided setup when you first install (no API key needed upfront)
+- **Copy button** — One-click copy of the full summary text
+- **Collapsible panel** — Click the header to collapse/expand the summary
+- **BYO API key** — Works with OpenAI, Anthropic via proxy, local models (LM Studio, Ollama), or any OpenAI-compatible endpoint
+- **Model auto-discovery** — Fetch available models from your endpoint with one click
+- **Custom prompts** — Fully editable prompt templates with sensible defaults
+- **Chrome + Firefox** — Supports both Chrome/Edge (Manifest V3) and Firefox (Manifest V2)
 
-## Quick Start
+<!-- TODO: Add screenshots: comment summary, dark mode, popup, onboarding -->
 
-### Install dependencies
+## Installation
+
+### Chrome Web Store
+
+*Coming soon*
+
+### Install from Source
 
 ```bash
+git clone https://github.com/user/reddit-ai-assistant.git
 cd reddit-ai-assistant
 npm install
+npm run build
 ```
 
-### Development
-
-```bash
-# Chrome (default)
-npx wxt
-
-# Firefox
-npx wxt --browser firefox
-```
-
-WXT will print a link to load the unpacked extension in your browser.
-
-### Production Build
-
-```bash
-# Chrome
-npx wxt build
-
-# Firefox
-npx wxt build --browser firefox
-```
-
-Output goes to `.output/chrome-mv3/` or `.output/firefox-mv3/`.
-
-### Load in Chrome
+Then load in Chrome:
 
 1. Open `chrome://extensions`
 2. Enable **Developer mode**
 3. Click **Load unpacked**
 4. Select the `.output/chrome-mv3` directory
 
+### Firefox
+
+```bash
+npm run build:firefox
+```
+
+Load in Firefox:
+
+1. Open `about:debugging#/runtime/this-firefox`
+2. Click **Load Temporary Add-on**
+3. Select `.output/firefox-mv2/manifest.json`
+
 ## Configuration
 
-After loading the extension, right-click the extension icon and select **Options** (or go to `chrome://extensions` → Reddit AI Assistant → Details → Extension options).
+### Quick Setup (Popup)
 
-### API Settings
+Click the extension icon in your toolbar to open the status dashboard:
 
-| Field | Default | Description |
+- **Model** — Select from auto-discovered models or type manually
+- **Endpoint** — Your API endpoint URL
+- **Save** — Stores settings locally
+
+### Full Settings (Options Page)
+
+Right-click the extension icon → **Options**, or click **Full Settings** from the popup:
+
+| Setting | Default | Description |
 |---|---|---|
-| API Endpoint | `https://api.openai.com/v1/chat/completions` | Any OpenAI-compatible chat completions endpoint |
-| API Key | *(empty)* | Your API key (stored locally, never sent to third parties) |
+| API Endpoint | `https://api.openai.com/v1/chat/completions` | Any OpenAI-compatible endpoint |
+| API Key | *(empty)* | Stored locally, never sent to third parties |
 | Model | `gpt-4o-mini` | Model name to use |
+| Post Prompt | *(built-in)* | Customizable prompt for post summaries |
+| Comment Prompt | *(built-in)* | Customizable prompt for comment summaries |
 
-Click **Test Connection** to verify your settings before saving.
+Use `{content}` as a placeholder for extracted text in custom prompts.
 
-### Prompt Templates
+## Privacy & Permissions
 
-Two prompt templates are provided with defaults:
+**Zero data collection.** No analytics, no tracking, no telemetry.
 
-- **Post Summary** — Summarizes the post title, author, and body in under 3 sentences
-- **Comment Summary** — Analyzes comment threads for themes, consensus, and debates
+- Your API key is stored locally in `chrome.storage.local`
+- All API calls go directly from your browser to your configured endpoint
+- No data passes through any third-party server
 
-Both are fully editable. Use `{content}` as a placeholder for the extracted text. Click **Reset to default** to restore originals.
+| Permission | Why |
+|---|---|
+| `storage` | Save API settings and prompt templates locally |
+| `activeTab` | Access current Reddit tab content for summarization |
+| `*://*.reddit.com/*` | Content script injection on Reddit pages only |
 
-## Architecture
+No broad host permissions. No remote code.
+
+## Development
+
+### Quick Start
+
+```bash
+npm install
+npx wxt          # Chrome dev mode
+npx wxt --browser firefox  # Firefox dev mode
+```
+
+WXT will print a URL to load the unpacked extension in your browser with hot reload.
+
+### Architecture
 
 ```
 src/
 ├── entrypoints/          # WXT entry points
 │   ├── background.ts     # Service worker (message routing, API calls)
 │   ├── content.ts        # Content script (injected into reddit.com)
+│   ├── popup/            # Status dashboard (Vue 3)
 │   └── options/          # Settings page (Vue 3 SPA)
 ├── background/           # Background service worker logic
 │   ├── router.ts         # Typed message router
 │   ├── ai-client.ts      # Streaming OpenAI-compatible client
-│   ├── prompt-builder.ts # Template injection
+│   ├── prompt-builder.ts # Template + system prompt builder
 │   └── config.ts         # chrome.storage settings manager
 ├── content/              # Content script logic
 │   ├── dom-adapter.ts    # Reddit DOM selector abstraction
-│   └── ui-injector.ts    # Button & summary panel injection
-├── options/views/        # Settings page Vue components
+│   └── ui-injector.ts    # Buttons, panel, onboarding, dark mode
+├── options/views/        # Settings page components
 │   ├── ApiSettings.vue
 │   ├── PromptTemplates.vue
 │   └── About.vue
-├── features/             # Feature modules (extensible)
-│   ├── summarize-post/
-│   └── summarize-comments/
 └── shared/               # Shared types and constants
     ├── types.ts
     └── constants.ts
 ```
 
-### Three-Layer Design
+**Three layers:**
 
-1. **Content Script** — Injected into `reddit.com`. Detects post pages, injects summarize buttons, extracts content via a DOM adapter, renders streaming responses.
+1. **Content Script** — Injected into reddit.com. Detects posts, injects buttons, extracts content, renders streaming responses. Handles dark mode and onboarding.
 
-2. **Background Service Worker** — Handles all API communication. Routes messages from content scripts, builds prompts, streams responses back via `chrome.runtime.Port`.
+2. **Background Service Worker** — Handles all API communication. Routes messages, builds prompts, streams responses via `chrome.runtime.Port`.
 
-3. **Options Page** — Vue 3 SPA for configuring API settings and prompt templates. Settings persist in `chrome.storage.local`.
-
-### Data Flow
-
-```
-User clicks "Summarize Post"
-  → Content script: DOM Adapter extracts post text
-  → Content script: chrome.runtime.connect() opens a Port
-  → Content script: sends { type: 'SUMMARIZE_POST', content }
-  → Background: Router dispatches to SummarizePostHandler
-  → Background: Prompt Builder injects content into template
-  → Background: AI Client sends streaming request to endpoint
-  → Background: For each token → { type: 'STREAM_TOKEN', token }
-  → Content script: Summary Panel renders tokens in real time
-  → Background: On done → { type: 'STREAM_DONE', totalTokens }
-  → Content script: Shows footer with token count
-```
+3. **Options + Popup** — Vue 3 SPAs. Popup is a status dashboard (connection state, quick settings). Options page has full settings (API, prompts, about).
 
 ### Adding New Features
 
-Features are modular. To add a new feature:
-
-1. Create `src/features/your-feature/messages.ts` with typed message definitions
-2. Register a handler in `entrypoints/background.ts`:
-
 ```ts
-registerHandler('YOUR_TYPE', async (request, port) => {
-  // handle and stream response
-});
+// 1. Define messages in src/features/your-feature/messages.ts
+// 2. Register a handler in entrypoints/background.ts:
+registerHandler('YOUR_TYPE', async (request, sendResponse) => { ... });
+// 3. Add UI triggers in content/ui-injector.ts
 ```
-
-3. Add UI triggers in `content/ui-injector.ts`
-
-No existing code needs modification.
-
-## Error Handling
-
-| Error | Behavior |
-|---|---|
-| Missing API key | Panel shows "Please configure your API key" message |
-| Network error | Panel shows "Connection failed" with retry button |
-| Rate limited (429) | Auto-retry with exponential backoff (1s → 2s → 4s), max 3 retries |
-| API error (5xx) | Panel shows error message with retry button |
-| Stream interrupted | Partial summary preserved, shows error badge with retry |
-| DOM change detected | Graceful "couldn't load" message |
-
-## Tech Stack
-
-| Layer | Technology |
-|---|---|
-| Framework | [WXT](https://wxt.dev/) 0.20.x — Manifest V3 |
-| UI | Vue 3 + TypeScript |
-| Build | Vite (via WXT) |
-| Browser | Chrome/Edge (primary), Firefox (secondary) |
-
-## Permissions
-
-- `storage` — Save API settings and custom prompts locally
-- `activeTab` — Access current Reddit tab content
-- Host permission: `*://*.reddit.com/*` — Content script injection only
-
-No broad host permissions. No data is sent anywhere except your configured API endpoint.
 
 ## License
 
-MIT
+[MIT](LICENSE)
