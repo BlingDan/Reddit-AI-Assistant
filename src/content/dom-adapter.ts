@@ -1,5 +1,12 @@
 import type { Comment } from '@/shared/types';
 
+/** Maximum number of top-level comment threads to include. */
+const MAX_TOP_LEVEL_THREADS = 20;
+/** Maximum number of direct replies per top-level thread. */
+const MAX_DIRECT_REPLIES = 5;
+/** Maximum number of nested replies at deeper levels. */
+const MAX_NESTED_REPLIES = 3;
+
 /**
  * Reddit "shreddit" DOM adapter — based on actual page analysis (2026-03).
  *
@@ -315,7 +322,7 @@ function extractComments(): Comment[] {
 
 /** Extract a single comment from a shreddit-comment element */
 function extractSingleComment(el: HTMLElement): Comment | null {
-  const author = el.getAttribute('author') || '';
+  const author = el.getAttribute('author') || '[unknown]';
   const score = parseInt(el.getAttribute('score') || '0', 10);
 
   let text = '';
@@ -385,12 +392,9 @@ export function getCommentsContent(): string {
   const title = findPostTitle();
   let comments = extractComments();
 
-  // Sort by score descending
-  comments.sort((a, b) => (b.score ?? 0) - (a.score ?? 0));
-
   // Limit to top threads (with their replies) to keep input manageable
-  const MAX_THREADS = 20;
-  const limited = comments.slice(0, MAX_THREADS);
+  // (extractComments already sorts by score descending)
+  const limited = comments.slice(0, MAX_TOP_LEVEL_THREADS);
 
   let content = `Post: ${title}\n\nDiscussion Threads (top ${limited.length} by score):\n`;
 
@@ -412,7 +416,7 @@ function formatCommentThread(comment: Comment, threadNum: number, depth: number)
   output += stripImageUrls(comment.text) + '\n';
 
   if (comment.replies && comment.replies.length > 0) {
-    const maxReplies = depth === 0 ? 5 : 3;
+    const maxReplies = depth === 0 ? MAX_DIRECT_REPLIES : MAX_NESTED_REPLIES;
     const limitedReplies = comment.replies.slice(0, maxReplies);
 
     limitedReplies.forEach((reply) => {
