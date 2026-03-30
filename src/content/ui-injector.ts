@@ -238,6 +238,12 @@ function tryInject(): boolean {
 
   injected = true;
   console.log('[Reddit AI Assistant] Buttons injected');
+  checkOnboarding().then((isReady) => {
+    if (!isReady) {
+      showOnboardingBanner();
+      document.querySelectorAll('.raa-btn').forEach((btn) => ((btn as HTMLButtonElement).disabled = true));
+    }
+  });
   return true;
 }
 
@@ -478,6 +484,48 @@ function applyTheme(): void {
   root.classList.toggle('raa-dark', detectDarkMode());
 }
 
+async function checkOnboarding(): Promise<boolean> {
+  const result = await chrome.storage.local.get(['reddit-ai-settings', 'raa-onboarded']);
+  const settings = result['reddit-ai-settings'];
+  if (result['raa-onboarded']) return true;
+  return !!(settings?.apiKey?.trim());
+}
+
+function showOnboardingBanner(): void {
+  if (document.getElementById('raa-onboarding')) return;
+  const banner = document.createElement('div');
+  banner.id = 'raa-onboarding';
+  banner.className = 'raa-onboarding';
+  const textDiv = document.createElement('div');
+  textDiv.className = 'raa-onboarding__text';
+  textDiv.innerHTML = '<strong>Get started with AI summaries</strong><p>Connect your OpenAI-compatible API key to start summarizing Reddit posts and comments.</p>';
+  const setupBtn = document.createElement('button');
+  setupBtn.className = 'raa-onboarding__btn';
+  setupBtn.textContent = 'Set up';
+  setupBtn.addEventListener('click', () => { chrome.runtime.openOptionsPage(); });
+  banner.appendChild(textDiv);
+  banner.appendChild(setupBtn);
+  const btnGroup = document.querySelector('.raa-buttons');
+  if (btnGroup?.parentElement) {
+    btnGroup.parentElement.insertBefore(banner, btnGroup.nextSibling);
+  }
+}
+
+function setupStorageListener(): void {
+  chrome.storage.onChanged.addListener((changes, area) => {
+    if (area !== 'local') return;
+    const settingsChange = changes['reddit-ai-settings'];
+    if (settingsChange) {
+      const newVal = settingsChange.newValue;
+      if (newVal?.apiKey?.trim()) {
+        document.getElementById('raa-onboarding')?.remove();
+        chrome.storage.local.set({ 'raa-onboarded': true });
+        enableButtons();
+      }
+    }
+  });
+}
+
 export function init(): void {
   console.log('[Reddit AI Assistant] Content script loaded');
   lastUrl = location.href;
@@ -488,6 +536,7 @@ export function init(): void {
   window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', applyTheme);
   const themeObserver = new MutationObserver(() => applyTheme());
   themeObserver.observe(document.documentElement, { attributes: true, attributeFilter: ['class', 'style'] });
+  setupStorageListener();
 
   // MutationObserver for delayed DOM readiness
   let debounceTimer: ReturnType<typeof setTimeout> | null = null;
