@@ -2,6 +2,7 @@ export interface Comment {
   author: string;
   text: string;
   score?: number;
+  replies?: Comment[];  // Nested replies within this comment thread
 }
 
 export interface SummarizePostRequest {
